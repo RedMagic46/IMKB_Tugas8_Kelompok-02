@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Schedule } from '../types/schedule';
-import { mockRooms, mockCourses } from '../data/mockData';
+import { Schedule, Course, Room } from '../types/schedule';
 import { X } from 'lucide-react';
 
 interface ScheduleEditModalProps {
   schedule?: Schedule | null; // Optional untuk mode create
+  courses: Course[];
+  rooms: Room[];
   onClose: () => void;
   onSave: (schedule: Schedule) => void;
 }
@@ -47,6 +48,8 @@ const timeToSlot = (time: string): number => {
 
 export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
   schedule,
+  courses,
+  rooms,
   onClose,
   onSave,
 }) => {
@@ -55,15 +58,15 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
   // Default empty form untuk create mode
   const defaultFormData: Schedule = {
     id: `sch-${Date.now()}`,
-    courseId: mockCourses[0]?.id || '',
-    courseName: mockCourses[0]?.name || '',
-    courseCode: mockCourses[0]?.code || '',
-    roomId: mockRooms[0]?.id || '',
-    roomName: mockRooms[0]?.name || '',
+    courseId: courses[0]?.id || '',
+    courseName: courses[0]?.name || '',
+    courseCode: courses[0]?.code || '',
+    roomId: rooms[0]?.id || '',
+    roomName: rooms[0]?.name || '',
     day: 'Monday',
     startTime: '07:00',
     endTime: '09:00',
-    lecturer: mockCourses[0]?.lecturer || '',
+    lecturer: courses[0]?.lecturer || '',
     hasConflict: false,
   };
 
@@ -92,6 +95,10 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Pastikan mata kuliah dan ruangan terpilih
+    if (!formData.courseId || !formData.roomId) {
+      return;
+    }
     onSave(formData);
   };
 
@@ -126,7 +133,7 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
               name="courseId"
               value={formData.courseId}
               onChange={(e) => {
-                const course = mockCourses.find((c) => c.id === e.target.value);
+                const course = courses.find((c) => c.id === e.target.value);
                 setFormData((prev) => ({
                   ...prev,
                   courseId: e.target.value,
@@ -137,12 +144,17 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               required
+              disabled={courses.length === 0}
             >
-              {mockCourses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name} - {course.code}
-                </option>
-              ))}
+              {courses.length === 0 ? (
+                <option value="">Belum ada mata kuliah</option>
+              ) : (
+                courses.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {course.name} - {course.code}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -214,7 +226,7 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
               name="roomId"
               value={formData.roomId}
               onChange={(e) => {
-                const room = mockRooms.find((r) => r.id === e.target.value);
+                const room = rooms.find((r) => r.id === e.target.value);
                 setFormData((prev) => ({
                   ...prev,
                   roomId: e.target.value,
@@ -223,14 +235,31 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
               }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               required
+              disabled={rooms.length === 0}
             >
-              {mockRooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.name} - {room.building}
-                </option>
-              ))}
+              {rooms.length === 0 ? (
+                <option value="">Belum ada ruangan</option>
+              ) : (
+                rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.name} - {room.building}
+                  </option>
+                ))
+              )}
             </select>
           </div>
+
+          {/* Info jika belum ada mata kuliah / ruangan */}
+          {(courses.length === 0 || rooms.length === 0) && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+              {courses.length === 0 && (
+                <p>Belum ada mata kuliah. Tambahkan terlebih dahulu di menu Mata Kuliah.</p>
+              )}
+              {rooms.length === 0 && (
+                <p className="mt-1">Belum ada ruangan. Tambahkan data ruangan terlebih dahulu.</p>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             <button
@@ -242,7 +271,8 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 text-sm sm:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={courses.length === 0 || rooms.length === 0}
+              className="flex-1 px-4 py-2 text-sm sm:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Simpan
             </button>

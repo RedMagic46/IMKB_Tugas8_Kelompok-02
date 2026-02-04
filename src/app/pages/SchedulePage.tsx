@@ -21,10 +21,18 @@ import { ScheduleEditModal } from '../components/ScheduleEditModal';
 import { toast } from 'sonner';
 import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../../lib/scheduleService';
 import { useRealtimeSchedules } from '../../hooks/useRealtimeSchedules';
+import { useRealtimeCourses } from '../../hooks/useRealtimeCourses';
+import { useRealtimeRooms } from '../../hooks/useRealtimeRooms';
 
 export const SchedulePage: React.FC = () => {
-  const { schedules: realtimeSchedules, loading: realtimeLoading, refresh: refreshSchedules } = useRealtimeSchedules();
-  
+  const {
+    schedules: realtimeSchedules,
+    loading: realtimeLoading,
+    refresh: refreshSchedules,
+  } = useRealtimeSchedules();
+  const { courses, loading: coursesLoading } = useRealtimeCourses();
+  const { rooms, loading: roomsLoading } = useRealtimeRooms();
+
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGeneratedTable, setShowGeneratedTable] = useState(false);
@@ -35,12 +43,12 @@ export const SchedulePage: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!realtimeLoading) {
+    if (!realtimeLoading && !coursesLoading && !roomsLoading) {
       const markedSchedules = markConflicts(realtimeSchedules);
       setSchedules(markedSchedules);
       setLoading(false);
     }
-  }, [realtimeSchedules, realtimeLoading]);
+  }, [realtimeSchedules, realtimeLoading, coursesLoading, roomsLoading]);
 
   const handleDetectConflicts = () => {
     const conflicts = detectConflicts(schedules);
@@ -510,6 +518,8 @@ export const SchedulePage: React.FC = () => {
         {isEditModalOpen && (
           <ScheduleEditModal
             schedule={selectedSchedule}
+            courses={courses}
+            rooms={rooms}
             onClose={() => {
               setIsEditModalOpen(false);
               setSelectedSchedule(null);
