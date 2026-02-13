@@ -75,7 +75,14 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
     schedule ? timeToSlot(schedule.startTime) : 1
   );
   const [sks, setSks] = useState<number>(
-    schedule ? Math.max(1, Math.ceil((timeToSlot(schedule.endTime) - timeToSlot(schedule.startTime)))) : 2
+    schedule
+      ? Math.max(
+          1,
+          Math.ceil(
+            timeToSlot(schedule.endTime) - timeToSlot(schedule.startTime)
+          )
+        )
+      : 1
   );
 
   // Auto-calculate end time when start slot or SKS changes
@@ -186,7 +193,9 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               >
-                {TIME_SLOTS.filter(t => t.slot <= 14 - sks + 1).map((timeSlot) => (
+              {TIME_SLOTS.filter(
+                (t) => t.slot <= TIME_SLOTS.length - sks + 1
+              ).map((timeSlot) => (
                   <option key={timeSlot.slot} value={timeSlot.slot}>
                     Jam ke-{timeSlot.slot} ({timeSlot.start})
                   </option>
