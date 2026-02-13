@@ -1,6 +1,13 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Schedule } from '../types/schedule';
+import {
+  TIME_SLOTS,
+  ScheduleTimeMode,
+  getDisplayTimeRange,
+  timeToSlot,
+  endTimeToSlot,
+} from './timeSlots';
 
 /**
  * UTILITY UNTUK EXPORT PDF
@@ -24,8 +31,12 @@ const formatDate = () => {
 /**
  * Export List View ke PDF
  * Format: Tabel biasa dengan kolom Kode, Nama, Hari, Waktu, Ruangan, Dosen, Status
+ * `mode` menentukan apakah waktu ditampilkan sebagai jam kuliah biasa atau jam puasa.
  */
-export const exportListViewPDF = (schedules: Schedule[]) => {
+export const exportListViewPDF = (
+  schedules: Schedule[],
+  mode: ScheduleTimeMode = 'normal'
+) => {
   const doc = new jsPDF('landscape');
 
   // Header
@@ -42,12 +53,35 @@ export const exportListViewPDF = (schedules: Schedule[]) => {
     { align: 'center' }
   );
 
+  // Helper untuk format waktu per baris sesuai mode
+  const getDisplayTimeForSchedule = (schedule: Schedule): string => {
+    if (mode === 'normal') {
+      return `${schedule.startTime} - ${schedule.endTime}`;
+    }
+
+    // Mode puasa: konversi ke slot lalu pakai rentang jam puasa
+    const startSlot = timeToSlot(schedule.startTime);
+    const endExclusive = endTimeToSlot(schedule.endTime);
+    const endSlot = Math.max(startSlot, endExclusive - 1);
+
+    const startRange = getDisplayTimeRange(startSlot, 'puasa');
+    const endRange = getDisplayTimeRange(endSlot, 'puasa');
+
+    if (!startRange || !endRange) {
+      return `${schedule.startTime} - ${schedule.endTime}`;
+    }
+
+    const [startStart] = startRange.split(' - ');
+    const [, endEnd] = endRange.split(' - ');
+    return `${startStart} - ${endEnd}`;
+  };
+
   // Prepare data
   const tableData = schedules.map((schedule) => [
     schedule.courseCode,
     schedule.courseName,
     schedule.day,
-    `${schedule.startTime} - ${schedule.endTime}`,
+    getDisplayTimeForSchedule(schedule),
     schedule.roomName,
     schedule.lecturer,
     schedule.hasConflict ? 'BENTROK' : 'OK',
@@ -114,59 +148,20 @@ export const exportListViewPDF = (schedules: Schedule[]) => {
 
 /**
  * Export Table View ke PDF
- * Format: Grid Hari (baris) x Jam (kolom) seperti jadwal kuliah pada umumnya
+ * Format: Grid Hari (baris) x Jam (kolom) seperti jadwal kuliah pada umumnya.
+ * `mode` menentukan apakah header jam menggunakan jam kuliah biasa atau jam puasa.
  */
-
-// Mapping jam akademik UMM (14 slot waktu) - sama dengan di ScheduleEditModal & ScheduleTableView
-const TIME_SLOTS = [
-  { slot: 1, start: '07:00', end: '07:50' },
-  { slot: 2, start: '07:50', end: '08:40' },
-  { slot: 3, start: '08:40', end: '09:30' },
-  { slot: 4, start: '09:30', end: '10:20' },
-  { slot: 5, start: '10:20', end: '11:10' },
-  { slot: 6, start: '11:10', end: '12:00' },
-  { slot: 7, start: '12:30', end: '13:20' },
-  { slot: 8, start: '13:20', end: '14:10' },
-  { slot: 9, start: '14:10', end: '15:00' },
-  { slot: 10, start: '15:30', end: '16:20' },
-  { slot: 11, start: '16:20', end: '17:10' },
-  { slot: 12, start: '18:15', end: '19:05' },
-  { slot: 13, start: '19:05', end: '19:55' },
-  { slot: 14, start: '19:55', end: '20:45' },
-];
-
-// Helper function: Convert waktu (HH:mm) ke slot number
-const timeToSlot = (time: string): number => {
-  const slot = TIME_SLOTS.find(t => t.start === time);
-  return slot ? slot.slot : 1;
-};
-
-// Helper function: Convert endTime ke slot number (cari berdasarkan end time)
-const endTimeToSlot = (time: string): number => {
-  // Cek apakah waktu ini adalah start dari sebuah slot (berarti ini end yang valid)
-  const startSlot = TIME_SLOTS.find(t => t.start === time);
-  if (startSlot) {
-    return startSlot.slot; // Return slot tersebut (exclusive)
-  }
-  
-  // Jika tidak, cari slot yang end-nya sama dengan waktu ini
-  const endSlot = TIME_SLOTS.find(t => t.end === time);
-  if (endSlot) {
-    return endSlot.slot + 1; // Return slot setelahnya (karena endSlot exclusive)
-  }
-  
-  // Fallback
-  return 15; // Beyond all slots
-};
-
-export const exportTableViewPDF = (schedules: Schedule[]) => {
+export const exportTableViewPDF = (
+  schedules: Schedule[],
+  mode: ScheduleTimeMode = 'normal'
+) => {
   // A4 landscape untuk satu lembar penuh
   const doc = new jsPDF('landscape', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Header judul semester di tengah atas (mirip gambar referensi)
   doc.setFontSize(16);
-  doc.text('Smt 3', pageWidth / 2, 15, { align: 'center' });
+  doc.text('Jadwal Kuliah', pageWidth / 2, 15, { align: 'center' });
 
   // Info tanggal kecil di kiri bawah seperti “Menghasilkan jadwal: ...”
   doc.setFontSize(8);
@@ -177,7 +172,7 @@ export const exportTableViewPDF = (schedules: Schedule[]) => {
   const headRow = ['']; // kolom pertama kosong (untuk hari)
   TIME_SLOTS.forEach((slot) => {
     headRow.push(
-      `${slot.slot}\n${slot.start.replace(':', '.')} - ${slot.end.replace(':', '.')}`
+      `${slot.slot}\n${getDisplayTimeRange(slot.slot, mode)}`
     );
   });
 

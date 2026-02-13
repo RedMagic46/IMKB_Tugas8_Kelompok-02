@@ -19,10 +19,21 @@ import { ScheduleCalendar } from '../components/ScheduleCalendar';
 import { ScheduleTableView } from '../components/ScheduleTableView';
 import { ScheduleEditModal } from '../components/ScheduleEditModal';
 import { toast } from 'sonner';
-import { getSchedules, createSchedule, updateSchedule, deleteSchedule } from '../../lib/scheduleService';
+import {
+  getSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+} from '../../lib/scheduleService';
 import { useRealtimeSchedules } from '../../hooks/useRealtimeSchedules';
 import { useRealtimeCourses } from '../../hooks/useRealtimeCourses';
 import { useRealtimeRooms } from '../../hooks/useRealtimeRooms';
+import {
+  ScheduleTimeMode,
+  timeToSlot,
+  endTimeToSlot,
+  getDisplayTimeRange,
+} from '../utils/timeSlots';
 
 export const SchedulePage: React.FC = () => {
   const {
@@ -41,6 +52,7 @@ export const SchedulePage: React.FC = () => {
   );
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [timeMode, setTimeMode] = useState<ScheduleTimeMode>('normal');
 
   useEffect(() => {
     if (!realtimeLoading && !coursesLoading && !roomsLoading) {
@@ -150,13 +162,35 @@ export const SchedulePage: React.FC = () => {
   const handleExportPDF = () => {
     if (showGeneratedTable) {
       // Export dalam format tabel grid
-      exportTableViewPDF(schedules);
+      exportTableViewPDF(schedules, timeMode);
       toast.success('Jadwal berhasil diekspor dalam format Tabel View!');
     } else {
       // Export dalam format list
-      exportListViewPDF(schedules);
+      exportListViewPDF(schedules, timeMode);
       toast.success('Jadwal berhasil diekspor dalam format List View!');
     }
+  };
+
+  // Helper: format tampilan waktu per jadwal sesuai mode jam (normal / puasa)
+  const getDisplayTimeForSchedule = (schedule: Schedule): string => {
+    if (timeMode === 'normal') {
+      return `${schedule.startTime} - ${schedule.endTime}`;
+    }
+
+    const startSlot = timeToSlot(schedule.startTime);
+    const endExclusive = endTimeToSlot(schedule.endTime);
+    const endSlot = Math.max(startSlot, endExclusive - 1);
+
+    const startRange = getDisplayTimeRange(startSlot, 'puasa');
+    const endRange = getDisplayTimeRange(endSlot, 'puasa');
+
+    if (!startRange || !endRange) {
+      return `${schedule.startTime} - ${schedule.endTime}`;
+    }
+
+    const [startStart] = startRange.split(' - ');
+    const [, endEnd] = endRange.split(' - ');
+    return `${startStart} - ${endEnd}`;
   };
 
   const conflictCount = schedules.filter((s) => s.hasConflict).length;
@@ -176,7 +210,7 @@ export const SchedulePage: React.FC = () => {
     <div className="min-h-screen bg-gray-50 pb-6">
       {/* Mobile Title Section - Not sticky, just below Layout header */}
       <div className="lg:hidden bg-white border-b px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-6 h-6 text-blue-600" />
             <h1 className="text-lg text-gray-900">Jadwal Kuliah</h1>
@@ -243,6 +277,15 @@ export const SchedulePage: React.FC = () => {
               <Download className="w-4 h-4" />
               Export PDF
             </button>
+            <button
+              onClick={() =>
+                setTimeMode((prev) => (prev === 'normal' ? 'puasa' : 'normal'))
+              }
+              className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {timeMode === 'normal' ? 'Mode Jam Puasa' : 'Mode Jam Biasa'}
+            </button>
           </div>
         )}
       </div>
@@ -281,7 +324,7 @@ export const SchedulePage: React.FC = () => {
           )}
 
           {/* Action Buttons - Desktop */}
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-3 flex-wrap items-center">
             <button
               onClick={handleDetectConflicts}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm sm:text-base"
@@ -319,6 +362,20 @@ export const SchedulePage: React.FC = () => {
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Export PDF</span>
               <span className="sm:hidden">Export</span>
+            </button>
+            <button
+              onClick={() =>
+                setTimeMode((prev) => (prev === 'normal' ? 'puasa' : 'normal'))
+              }
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 text-sm sm:text-base"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {timeMode === 'normal' ? 'Jam Puasa' : 'Jam Biasa'}
+              </span>
+              <span className="sm:hidden">
+                {timeMode === 'normal' ? 'Jam Puasa' : 'Jam Biasa'}
+              </span>
             </button>
           </div>
         </div>
@@ -388,8 +445,8 @@ export const SchedulePage: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs mb-0.5">Waktu</p>
-                      <p className="text-gray-900">
-                        {schedule.startTime} - {schedule.endTime}
+                                      <p className="text-gray-900">
+                        {getDisplayTimeForSchedule(schedule)}
                       </p>
                     </div>
                     <div>
@@ -470,7 +527,7 @@ export const SchedulePage: React.FC = () => {
                           {schedule.day}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-700">
-                          {schedule.startTime} - {schedule.endTime}
+                          {getDisplayTimeForSchedule(schedule)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-700">
                           {schedule.roomName}
