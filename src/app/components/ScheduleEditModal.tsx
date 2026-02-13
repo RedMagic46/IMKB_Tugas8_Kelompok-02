@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Schedule, Course, Room } from '../types/schedule';
 import { X } from 'lucide-react';
+import { TIME_SLOTS, timeToSlot, endTimeToSlot } from '../utils/timeSlots';
 
 interface ScheduleEditModalProps {
   schedule?: Schedule | null; // Optional untuk mode create
@@ -20,31 +21,7 @@ const DAY_LABELS: Record<string, string> = {
   'Saturday': 'Sabtu',
 };
 
-// Mapping jam akademik UMM (14 slot waktu)
-const TIME_SLOTS = [
-  { slot: 1, start: '07:00', end: '07:50' },
-  { slot: 2, start: '07:50', end: '08:40' },
-  { slot: 3, start: '08:40', end: '09:30' },
-  { slot: 4, start: '09:30', end: '10:20' },
-  { slot: 5, start: '10:20', end: '11:10' },
-  { slot: 6, start: '11:10', end: '12:00' },
-  { slot: 7, start: '12:30', end: '13:20' },
-  { slot: 8, start: '13:20', end: '14:10' },
-  { slot: 9, start: '14:10', end: '15:00' },
-  { slot: 10, start: '15:30', end: '16:20' },
-  { slot: 11, start: '16:20', end: '17:10' },
-  { slot: 12, start: '18:15', end: '19:05' },
-  { slot: 13, start: '19:05', end: '19:55' },
-  { slot: 14, start: '19:55', end: '20:45' },
-];
-
 const SKS_OPTIONS = [1, 2, 3, 4];
-
-// Helper function untuk convert waktu ke slot
-const timeToSlot = (time: string): number => {
-  const slot = TIME_SLOTS.find(t => t.start === time);
-  return slot ? slot.slot : 1;
-};
 
 export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
   schedule,
@@ -70,32 +47,44 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
     hasConflict: false,
   };
 
-  const [formData, setFormData] = useState<Schedule>(schedule || defaultFormData);
+  const [formData, setFormData] = useState<Schedule>(
+    schedule || defaultFormData
+  );
   const [startSlot, setStartSlot] = useState<number>(
     schedule ? timeToSlot(schedule.startTime) : 1
   );
-  const [sks, setSks] = useState<number>(
-    schedule
-      ? Math.max(
-          1,
-          Math.ceil(
-            timeToSlot(schedule.endTime) - timeToSlot(schedule.startTime)
-          )
-        )
-      : 1
-  );
+  const [sks, setSks] = useState<number>(() => {
+    if (!schedule) return 1;
+    const start = timeToSlot(schedule.startTime);
+    const endExclusive = endTimeToSlot(schedule.endTime);
+    const raw = endExclusive - start;
+    const clamped = Math.max(1, Math.min(SKS_OPTIONS[SKS_OPTIONS.length - 1], raw));
+    return clamped;
+  });
 
   // Auto-calculate end time when start slot or SKS changes
   useEffect(() => {
-    const endSlot = startSlot + sks;
-    const startTimeData = TIME_SLOTS.find(t => t.slot === startSlot);
-    const endTimeData = TIME_SLOTS.find(t => t.slot === endSlot);
-    
-    if (startTimeData && endTimeData) {
-      setFormData(prev => ({
+    const startTimeData = TIME_SLOTS.find((t) => t.slot === startSlot);
+
+    // endExclusive adalah slot "setelah" kuliah berakhir
+    const endExclusive = startSlot + sks;
+    let endTime: string | undefined;
+
+    if (endExclusive <= TIME_SLOTS.length) {
+      // Masih dalam rentang slot, pakai start slot berikutnya
+      const endTimeData = TIME_SLOTS.find((t) => t.slot === endExclusive);
+      endTime = endTimeData?.start;
+    } else {
+      // Melewati slot terakhir: pakai end time slot terakhir (misal 20:45)
+      const lastSlot = TIME_SLOTS[TIME_SLOTS.length - 1];
+      endTime = lastSlot.end;
+    }
+
+    if (startTimeData && endTime) {
+      setFormData((prev) => ({
         ...prev,
         startTime: startTimeData.start,
-        endTime: endTimeData.start,
+        endTime,
       }));
     }
   }, [startSlot, sks]);
@@ -223,10 +212,32 @@ export const ScheduleEditModal: React.FC<ScheduleEditModalProps> = ({
 
           {/* Info waktu selesai */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-sm text-blue-800">
-              <span className="font-medium">Waktu Kuliah:</span> Jam ke-{startSlot} s/d Jam ke-{startSlot + sks} 
-              ({TIME_SLOTS.find(t => t.slot === startSlot)?.start} - {TIME_SLOTS.find(t => t.slot === startSlot + sks)?.start})
-            </p>
+            {(() => {
+              const startInfo = TIME_SLOTS.find((t) => t.slot === startSlot);
+              const endExclusive = startSlot + sks;
+              const endSlotLabel = Math.min(
+                TIME_SLOTS.length,
+                Math.max(startSlot, endExclusive - 1)
+              );
+              const endInfo =
+                endExclusive <= TIME_SLOTS.length
+                  ? TIME_SLOTS.find((t) => t.slot === endExclusive)
+                  : TIME_SLOTS[TIME_SLOTS.length - 1];
+
+              const startTimeLabel = startInfo?.start ?? '';
+              const endTimeLabel =
+                endExclusive <= TIME_SLOTS.length
+                  ? endInfo?.start ?? ''
+                  : endInfo?.end ?? '';
+
+              return (
+                <p className="text-sm text-blue-800">
+                  <span className="font-medium">Waktu Kuliah:</span> Jam ke-
+                  {startSlot} s/d Jam ke-{endSlotLabel} ({startTimeLabel} -{' '}
+                  {endTimeLabel})
+                </p>
+              );
+            })()}
           </div>
 
           <div>
