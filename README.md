@@ -120,7 +120,6 @@ src/
 │       ├── scheduleAlgorithm.ts
 │       └── exportPDF.ts
 ├── lib/                   # Data services (localStorage)
-│   ├── supabase.ts        # (Legacy - tidak digunakan)
 │   ├── auth.ts
 │   ├── scheduleService.ts # Service untuk jadwal (localStorage)
 │   ├── courseService.ts   # Service untuk mata kuliah (localStorage)
@@ -199,4 +198,3 @@ MIT License - Bebas digunakan untuk pembelajaran dan produksi.
 - 🌐 **Website**: [jadwalkuliahkhs.online](https://jadwalkuliahkhs.online)
 
 ---
-

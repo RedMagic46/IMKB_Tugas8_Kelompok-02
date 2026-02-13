@@ -160,162 +160,129 @@ const endTimeToSlot = (time: string): number => {
 };
 
 export const exportTableViewPDF = (schedules: Schedule[]) => {
-  const doc = new jsPDF('landscape');
+  // A4 landscape untuk satu lembar penuh
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Header
-  doc.setFontSize(18);
-  doc.text('JADWAL KULIAH - TABEL VIEW', doc.internal.pageSize.getWidth() / 2, 15, {
-    align: 'center',
+  // Header judul semester di tengah atas (mirip gambar referensi)
+  doc.setFontSize(16);
+  doc.text('Smt 3', pageWidth / 2, 15, { align: 'center' });
+
+  // Info tanggal kecil di kiri bawah seperti “Menghasilkan jadwal: ...”
+  doc.setFontSize(8);
+  doc.text(`Menghasilkan jadwal: ${formatDate()}`, 10, 200);
+
+  // Baris header jam 1–14 dengan rentang waktu
+  const dayLabels = ['Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu'];
+  const headRow = ['']; // kolom pertama kosong (untuk hari)
+  TIME_SLOTS.forEach((slot) => {
+    headRow.push(
+      `${slot.slot}\n${slot.start.replace(':', '.')} - ${slot.end.replace(':', '.')}`
+    );
   });
 
-  doc.setFontSize(10);
-  doc.text(
-    `Dicetak pada: ${formatDate()}`,
-    doc.internal.pageSize.getWidth() / 2,
-    22,
-    { align: 'center' }
-  );
+  // Helper: dapatkan jadwal untuk kombinasi hari (label Indonesia) dan slot
+  const getScheduleForDayAndSlot = (dayLabel: string, slot: number): Schedule | null => {
+    const mapDayToEnglish: Record<string, string> = {
+      Senin: 'Monday',
+      Selasa: 'Tuesday',
+      Rabu: 'Wednesday',
+      Kamis: 'Thursday',
+      "Jum'at": 'Friday',
+      Sabtu: 'Saturday',
+    };
+    const eng = mapDayToEnglish[dayLabel];
+    if (!eng) return null;
 
-  // Define time slots dengan format yang benar
-  const timeSlots = TIME_SLOTS.map(t => ({
-    label: `Jam ${t.slot}\n${t.start.replace(':', '.')}-${t.end.replace(':', '.')}`,
-    slot: t.slot,
-    start: t.start,
-  }));
-
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const dayLabels: Record<string, string> = {
-    Monday: 'Senin',
-    Tuesday: 'Selasa',
-    Wednesday: 'Rabu',
-    Thursday: 'Kamis',
-    Friday: 'Jumat',
-    Saturday: 'Sabtu',
+    return (
+      schedules.find((schedule) => {
+        if (schedule.day !== eng) return false;
+        const startSlot = timeToSlot(schedule.startTime);
+        const endSlot = endTimeToSlot(schedule.endTime);
+        return slot >= startSlot && slot < endSlot;
+      }) || null
+    );
   };
 
-  // Helper untuk cek overlap waktu (gunakan slot-based logic)
-  const getScheduleForDayAndSlot = (day: string, slot: number): Schedule | null => {
-    return schedules.find((schedule) => {
-      const scheduleStartSlot = timeToSlot(schedule.startTime);
-      const scheduleEndSlot = endTimeToSlot(schedule.endTime);
+  // Helper: cek starting slot dan colSpan seperti pada ScheduleTableView
+  const isStartingSlot = (schedule: Schedule, slot: number) =>
+    timeToSlot(schedule.startTime) === slot;
+  const calculateColSpan = (schedule: Schedule) =>
+    endTimeToSlot(schedule.endTime) - timeToSlot(schedule.startTime);
 
-      return (
-        schedule.day === day &&
-        slot >= scheduleStartSlot &&
-        slot < scheduleEndSlot
-      );
-    }) || null;
-  };
+  // Bangun body tabel: tiap baris = satu hari dengan cell merged
+  const body: any[] = [];
+  dayLabels.forEach((label) => {
+    const row: any[] = [];
+    row.push({ content: label, styles: { fontStyle: 'bold' } });
 
-  // Helper untuk cek apakah slot adalah starting cell dari jadwal
-  const isStartingSlot = (schedule: Schedule, slot: number): boolean => {
-    const scheduleStartSlot = timeToSlot(schedule.startTime);
-    return scheduleStartSlot === slot;
-  };
+    const processed = new Set<number>();
+    TIME_SLOTS.forEach((slotObj, index) => {
+      const slotNumber = slotObj.slot;
+      if (processed.has(index)) return;
 
-  // Helper untuk hitung berapa kolom yang harus di-span
-  const calculateColSpan = (schedule: Schedule): number => {
-    const startSlot = timeToSlot(schedule.startTime);
-    const endSlot = endTimeToSlot(schedule.endTime);
-    return endSlot - startSlot;
-  };
-
-  // Build table data
-  const tableData = days.map((day) => {
-    const row = [dayLabels[day]];
-    const processedSlots = new Set<number>(); // Track which slot indices have been processed
-
-    timeSlots.forEach((timeSlot, slotIndex) => {
-      // Skip jika slot ini sudah diproses (bagian dari colspan sebelumnya)
-      if (processedSlots.has(slotIndex)) {
+      const schedule = getScheduleForDayAndSlot(label, slotNumber);
+      if (!schedule) {
+        row.push(''); // cell kosong
         return;
       }
 
-      const schedule = getScheduleForDayAndSlot(day, timeSlot.slot);
+      if (!isStartingSlot(schedule, slotNumber)) {
+        return; // akan ditangani oleh starting cell
+      }
 
-      if (schedule) {
-        // Cek apakah ini starting slot
-        if (isStartingSlot(schedule, timeSlot.slot)) {
-          const colSpan = calculateColSpan(schedule);
-          
-          // Add cell dengan colspan info
-          row.push({
-            content: `${schedule.courseCode}\n${schedule.courseName}\n${schedule.roomName}\n${schedule.lecturer}`,
-            colSpan: colSpan,
-            styles: { fillColor: [219, 234, 254] } // Light blue
-          });
-          
-          // Mark next slots as processed
-          for (let i = 1; i < colSpan; i++) {
-            processedSlots.add(slotIndex + i);
-          }
-        }
-        // Jika bukan starting slot, skip (sudah di-handle oleh starting slot)
-      } else {
-        // Empty cell
-        row.push('-');
+      const span = calculateColSpan(schedule);
+      row.push({
+        content: `${schedule.courseName}\n${schedule.roomName}\n${schedule.courseCode}`,
+        colSpan: span,
+        styles: { fillColor: [255, 255, 255] },
+      });
+
+      // tandai slot berikutnya sebagai sudah ter-cover
+      for (let i = 1; i < span; i++) {
+        processed.add(index + i);
       }
     });
 
-    return row;
+    body.push(row);
   });
 
-  // Generate table
   autoTable(doc, {
-    head: [['Hari', ...timeSlots.map((slot) => slot.label)]],
-    body: tableData,
-    startY: 30,
+    head: [headRow],
+    body,
+    // mulai sedikit di bawah judul agar grid memenuhi halaman
+    startY: 25,
     theme: 'grid',
     headStyles: {
-      fillColor: [59, 130, 246], // Blue
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
       fontSize: 7,
-      minCellHeight: 8,
-    },
-    styles: {
-      fontSize: 6,
-      cellPadding: 1.5,
       halign: 'center',
       valign: 'middle',
+      minCellHeight: 18,
+    },
+    styles: {
+      fontSize: 7,
+      halign: 'center',
+      valign: 'middle',
+      cellPadding: 1.2,
       lineWidth: 0.3,
-      lineColor: [200, 200, 200],
-      minCellHeight: 12,
+      lineColor: [0, 0, 0],
+      // Tinggikan cell supaya grid memenuhi tinggi halaman
+      minCellHeight: 22,
       overflow: 'linebreak',
     },
     columnStyles: {
-      0: {
-        cellWidth: 18,
-        fillColor: [243, 244, 246],
-        fontStyle: 'bold',
-        fontSize: 7,
-      },
-      // Kolom jam - width otomatis dibagi rata untuk 14 kolom
+      0: { cellWidth: 18 }, // kolom hari
+      // kolom jam otomatis disesuaikan lebar-nya agar muat 14 kolom
     },
-    didParseCell: (data) => {
-      // Atur warna untuk cell yang ada jadwalnya
-      if (data.section === 'body' && data.column.index > 0) {
-        if (data.cell.text[0] !== '-') {
-          data.cell.styles.fillColor = [219, 234, 254]; // Light blue
-        }
-      }
+    // Margin kecil di atas & bawah supaya tabel hampir penuh 1 lembar
+    margin: { top: 18, left: 10, right: 10, bottom: 10 },
+    didDrawCell: () => {
+      // tidak ada styling ekstra per-cell di sini;
+      // grid sederhana agar mirip contoh referensi
     },
   });
 
-  // Footer
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.text(
-      `Halaman ${i} dari ${pageCount} | Jadwal Kuliah 7.00-20.45`,
-      doc.internal.pageSize.getWidth() / 2,
-      doc.internal.pageSize.getHeight() - 10,
-      { align: 'center' }
-    );
-  }
-
-  // Save
   doc.save(`Jadwal-Kuliah-Table-${Date.now()}.pdf`);
 };
