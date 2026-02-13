@@ -115,17 +115,30 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
       <div className="min-w-[1200px]">
         <table className="w-full border-collapse">
           <thead>
+            {/* Baris judul semester yang membentang penuh seperti contoh gambar */}
+            <tr>
+              <th className="border border-gray-300 p-3 bg-gray-50 w-24"></th>
+              <th
+                colSpan={TIME_SLOTS.length}
+                className="border border-gray-300 p-3 bg-gray-50 text-center text-lg font-semibold text-gray-800"
+              >
+                Smt 3
+              </th>
+            </tr>
+            {/* Baris header jam ke- dan rentang waktu */}
             <tr>
               <th className="border border-gray-300 p-3 bg-gray-50 text-gray-700 w-24">
-                {/* Empty cell for day column */}
+                {/* Kolom hari */}
               </th>
               {TIME_SLOTS.map((timeSlot) => (
                 <th
                   key={timeSlot.slot}
-                  className="border border-gray-300 p-2 bg-gray-50 text-gray-700"
+                  className="border border-gray-300 p-2 bg-gray-50 text-gray-700 text-center"
                 >
-                  <div>Jam {timeSlot.slot}</div>
-                  <div className="text-gray-500">{getTimeRange(timeSlot.slot)}</div>
+                  <div className="font-medium"> {timeSlot.slot}</div>
+                  <div className="text-gray-500 text-xs">
+                    {getTimeRange(timeSlot.slot)}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -133,7 +146,7 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
           <tbody>
             {DAYS.map((day) => (
               <tr key={day}>
-                <td className="border border-gray-300 p-4 bg-gray-50 text-gray-900">
+                <td className="border border-gray-300 p-4 bg-gray-50 text-gray-900 font-semibold">
                   {day}
                 </td>
                 {TIME_SLOTS.map((timeSlot) => {
@@ -159,16 +172,16 @@ export const ScheduleTableView: React.FC<ScheduleTableViewProps> = ({
                     <td
                       key={`${day}-${timeSlot.slot}`}
                       colSpan={colSpan}
-                      className="border border-gray-300 p-2 bg-blue-50 align-top"
+                      className="border border-gray-300 p-2 bg-blue-50 align-top text-center text-xs leading-tight"
                     >
-                      <div className="text-gray-900 mb-1">
+                      <div className="text-gray-900 font-semibold mb-1">
                         {schedule.courseName}
                       </div>
-                      <div className="text-gray-700">
-                        {schedule.roomName}
-                      </div>
-                      <div className="text-gray-600 mt-1">
+                      <div className="text-gray-700 text-[11px]">
                         {schedule.courseCode}
+                      </div>
+                      <div className="text-gray-600 text-[11px] mt-1">
+                        {schedule.roomName}
                       </div>
                     </td>
                   );
