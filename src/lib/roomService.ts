@@ -9,12 +9,39 @@ const getStoredRooms = (): Room[] => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsedRooms: Room[] = JSON.parse(stored);
+
+      // Auto-sync: Check if there are any rooms in mockRooms that are missing or different in stored data
+      let needsSave = false;
+      const updatedRooms = [...parsedRooms];
+
+      mockRooms.forEach(mockRoom => {
+        const index = updatedRooms.findIndex(r => r.id === mockRoom.id);
+        if (index === -1) {
+          updatedRooms.push(mockRoom);
+          needsSave = true;
+        } else {
+          // Jika data di mockRooms berubah (misal nama atau gedung), update di storage juga
+          if (updatedRooms[index].name !== mockRoom.name ||
+            updatedRooms[index].building !== mockRoom.building ||
+            updatedRooms[index].capacity !== mockRoom.capacity) {
+            updatedRooms[index] = { ...updatedRooms[index], ...mockRoom };
+            needsSave = true;
+          }
+        }
+      });
+
+      if (needsSave) {
+        saveRooms(updatedRooms);
+        return updatedRooms;
+      }
+
+      return parsedRooms;
     }
   } catch (error) {
     console.error('Error reading rooms from localStorage:', error);
   }
-  
+
   // Initialize dengan mock data jika belum ada
   const initialRooms = [...mockRooms];
   saveRooms(initialRooms);
@@ -55,7 +82,7 @@ export const createRoom = async (roomData: {
     building: roomData.building,
     capacity: roomData.capacity,
   };
-  
+
   rooms.push(newRoom);
   saveRooms(rooms);
   return newRoom;
@@ -67,11 +94,11 @@ export const updateRoom = async (
 ): Promise<Room> => {
   const rooms = getStoredRooms();
   const index = rooms.findIndex(r => r.id === id);
-  
+
   if (index === -1) {
     throw new Error('Ruangan tidak ditemukan');
   }
-  
+
   rooms[index] = { ...rooms[index], ...updates };
   saveRooms(rooms);
   return rooms[index];
@@ -80,11 +107,11 @@ export const updateRoom = async (
 export const deleteRoom = async (id: string): Promise<void> => {
   const rooms = getStoredRooms();
   const filtered = rooms.filter(r => r.id !== id);
-  
+
   if (filtered.length === rooms.length) {
     throw new Error('Ruangan tidak ditemukan');
   }
-  
+
   saveRooms(filtered);
 };
 

@@ -144,7 +144,7 @@ export const mockSchedules: Schedule[] = [
     courseName: 'Basis Data',
     courseCode: 'CS202',
     roomId: 'room-3',
-    roomName: 'R308',
+    roomName: 'R320',
     day: 'Tuesday',
     startTime: '07:00', // Jam ke-1
     endTime: '09:30',   // Sampai jam ke-3 end (3 SKS = jam 1,2,3)
@@ -157,7 +157,7 @@ export const mockSchedules: Schedule[] = [
     courseName: 'Sistem Operasi',
     courseCode: 'CS301',
     roomId: 'room-4',
-    roomName: 'R401',
+    roomName: 'R308',
     day: 'Tuesday',
     startTime: '07:50', // Jam ke-2
     endTime: '10:20',   // Sampai jam ke-4 end (3 SKS = jam 2,3,4)
@@ -170,7 +170,7 @@ export const mockSchedules: Schedule[] = [
     courseName: 'Jaringan Komputer',
     courseCode: 'CS302',
     roomId: 'room-5',
-    roomName: 'R403',
+    roomName: 'R401',
     day: 'Wednesday',
     startTime: '12:30', // Jam ke-7
     endTime: '15:00',   // Sampai jam ke-9 end (3 SKS = jam 7,8,9)
